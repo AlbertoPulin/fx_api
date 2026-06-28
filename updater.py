@@ -1,39 +1,39 @@
-
 """
 Aggiorna fx_rates con i dati mancanti da Banca d'Italia.
 - Scarica solo EUR e USD come base
 - Parte dall'ultima data presente nel DB fino a oggi
-- Invia email di notifica al completamento
+- Invia email di notifica via Resend
 """
 
 import requests
 import time
-import smtplib
-from email.mime.text import MIMEText
 from datetime import date, timedelta
 from database import get_connection
 
-BASE_URL = "https://tassidicambio.bancaditalia.it/terzevalute-wf-web/rest/v1.0/dailyTimeSeries"
-
-# Configurazione email
-EMAIL_FROM     = "albertopulin5@gmail.com"
-EMAIL_TO       = "albertopulin5@gmail.com"
-EMAIL_PASSWORD = "tnjq wkwg upyy yjtn"  # App Password Gmail (non la password normale)
-SMTP_SERVER    = "smtp.gmail.com"
-SMTP_PORT      = 587
+BASE_URL    = "https://tassidicambio.bancaditalia.it/terzevalute-wf-web/rest/v1.0/dailyTimeSeries"
+RESEND_KEY  = "re_Kr5LULLT_ELxsXU3fRATb7jcAQVaBLGYg"
+EMAIL_FROM  = "onboarding@resend.dev"
+EMAIL_TO    = "albertopulin5@gmail.com"
 
 def invia_email(oggetto: str, corpo: str):
     try:
-        msg = MIMEText(corpo)
-        msg["Subject"] = oggetto
-        msg["From"]    = EMAIL_FROM
-        msg["To"]      = EMAIL_TO
-
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_FROM, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
-        print("📧 Email inviata")
+        r = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from":    EMAIL_FROM,
+                "to":      [EMAIL_TO],
+                "subject": oggetto,
+                "text":    corpo
+            }
+        )
+        if r.status_code in (200, 201):
+            print("📧 Email inviata")
+        else:
+            print(f"⚠️  Errore invio email: {r.status_code} {r.text}")
     except Exception as e:
         print(f"⚠️  Errore invio email: {e}")
 
