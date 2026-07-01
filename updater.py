@@ -36,7 +36,7 @@ def invia_email(oggetto: str, corpo: str):
             print(f"⚠️  Errore invio email: {r.status_code} {r.text}")
     except Exception as e:
         print(f"⚠️  Errore invio email: {e}")
-
+        
 def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
     params = {
         "startDate":           start,
@@ -48,9 +48,10 @@ def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
     headers = {"Accept": "application/json"}
     try:
         r = requests.get(BASE_URL, params=params, headers=headers, timeout=30)
-        if r.status_code == 200:
-            return r.json().get("rates", [])
-        return []
+        if r.status_code != 200:
+            print(f"⚠️  {base}/{quote}: status {r.status_code} - {r.text[:100]}")
+            return []
+        return r.json().get("rates", [])
     except Exception as e:
         print(f"⚠️  Errore {base}/{quote}: {e}")
         return []
