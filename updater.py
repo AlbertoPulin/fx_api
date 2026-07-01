@@ -1,6 +1,6 @@
 """
 Aggiorna fx_rates con i dati mancanti da Banca d'Italia.
-- Scarica solo EUR e USD come base
+- BdI API: baseCurrencyIsoCode = valuta estera, currencyIsoCode = EUR o USD
 - Parte dall'ultima data PER COPPIA fino a oggi
 - Invia email di notifica via Resend
 """
@@ -36,22 +36,29 @@ def invia_email(oggetto: str, corpo: str):
             print(f"⚠️  Errore invio email: {r.status_code} {r.text}")
     except Exception as e:
         print(f"⚠️  Errore invio email: {e}")
-        
+
 def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
+    """
+    BdI API:
+      baseCurrencyIsoCode = valuta estera (es. GBP)
+      currencyIsoCode     = EUR o USD (valuta di riferimento)
+    Per EUR/GBP: baseCurrencyIsoCode=GBP, currencyIsoCode=EUR
+    """
     params = {
         "startDate":           start,
         "endDate":             end,
-        "baseCurrencyIsoCode": base,
-        "currencyIsoCode":     quote,
+        "baseCurrencyIsoCode": quote,  # valuta estera
+        "currencyIsoCode":     base,   # EUR o USD
         "lang": "it"
     }
     headers = {"Accept": "application/json"}
     try:
         r = requests.get(BASE_URL, params=params, headers=headers, timeout=30)
-        if r.status_code != 200:
+        if r.status_code == 200:
+            return r.json().get("rates", [])
+        if r.status_code != 400:
             print(f"⚠️  {base}/{quote}: status {r.status_code} - {r.text[:100]}")
-            return []
-        return r.json().get("rates", [])
+        return []
     except Exception as e:
         print(f"⚠️  Errore {base}/{quote}: {e}")
         return []
