@@ -95,7 +95,9 @@ def aggiorna_cambi():
 
     totale = 0
     errori = 0
-    for pair_id, base, quote in coppie:
+    for i, (pair_id, base, quote) in enumerate(coppie, 1):
+        if i % 50 == 0 or i == 1:
+            print(f"   ⏳ [{i}/{len(coppie)}] {base}/{quote}...")
         rates = fetch_daily(base, quote, str(start_date), str(end_date))
         if not rates:
             time.sleep(0.1)
