@@ -71,7 +71,7 @@ def get_rates(
     # Nessuna coppia diretta né inversa: inferenza cross rate
     parts = symbol_db.split("/")
     if len(parts) != 2:
-        raise HTTPException(status_code=400, detail="Formato simbolo non valido. Usa EUR-USD")
+        raise HTTPException(status_code=400, detail="Formato simbolo non valido. Usa ad esempio la seguente notazione con le due coppie di valute EUR-USD")
     base, quote = parts
  
     result = _cross_rate(cur, conn, base, quote, date_on, from_date, to_date)
@@ -195,9 +195,9 @@ def _cross_rate(cur, conn, base, quote, date_on, from_date, to_date):
         raise HTTPException(status_code=404, detail=f"Nessun dato per {symbol}")
  
     data = [{"date": str(r[0]), "close": round(float(r[1]), 6)} for r in rows]
-    return {"symbol": symbol, "data": data, "inferred": True}
+    return {"symbol": symbol, "data": data}
     if not rows:
         raise HTTPException(status_code=404, detail=f"Nessun dato per {symbol}")
 
     data = [{"date": str(r[0]), "close": round(float(r[1]), 6)} for r in rows]
-    return {"symbol": symbol, "data": data, "inferred": True}
+    return {"symbol": symbol, "data": data}
