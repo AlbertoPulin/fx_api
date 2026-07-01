@@ -1,7 +1,7 @@
 """
 Aggiorna fx_rates con i dati mancanti da Banca d'Italia.
 - Scarica solo EUR e USD come base
-- Parte dall'ultima data presente nel DB fino a oggi
+- Parte dall'ultima data PER COPPIA fino a oggi
 - Invia email di notifica via Resend
 """
 
@@ -61,28 +61,7 @@ def aggiorna_cambi():
     conn = get_connection()
     cur  = conn.cursor()
 
-    # Ultima data presente nel DB
-    cur.execute("SELECT MAX(date) FROM fx_rates")
-    last_date = cur.fetchone()[0]
-
-    if last_date is None:
-        start_date = date(2001, 1, 1)
-    else:
-        start_date = last_date + timedelta(days=1)
-
     end_date = date.today()
-
-    if start_date > end_date:
-        print("✅ DB già aggiornato")
-        cur.close()
-        conn.close()
-        invia_email(
-            "FX API - Nessun aggiornamento necessario",
-            f"Il DB è già aggiornato all'ultima data disponibile ({last_date})."
-        )
-        return
-
-    print(f"📅 Scarico {start_date} → {end_date}")
 
     # Carica solo coppie EUR e USD
     cur.execute("""
@@ -96,8 +75,22 @@ def aggiorna_cambi():
     totale = 0
     errori = 0
     for i, (pair_id, base, quote) in enumerate(coppie, 1):
+
+        # Ultima data PER QUESTA COPPIA
+        cur.execute("SELECT MAX(date) FROM fx_rates WHERE pair_id = %s", (pair_id,))
+        last_date = cur.fetchone()[0]
+
+        if last_date is None:
+            start_date = date(2001, 1, 1)
+        else:
+            start_date = last_date + timedelta(days=1)
+
+        if start_date > end_date:
+            continue  # già aggiornata, salta
+
         if i % 50 == 0 or i == 1:
-            print(f"   ⏳ [{i}/{len(coppie)}] {base}/{quote}...")
+            print(f"   ⏳ [{i}/{len(coppie)}] {base}/{quote} dal {start_date}...")
+
         rates = fetch_daily(base, quote, str(start_date), str(end_date))
         if not rates:
             time.sleep(0.1)
@@ -136,7 +129,6 @@ def aggiorna_cambi():
         f"FX API - Aggiornamento completato {date.today()}",
         f"""Aggiornamento cambi completato.
 
-Data scaricata: {start_date} → {end_date}
 Righe inserite: {totale}
 Errori:         {errori}
 Coppie:         {len(coppie)} (EUR e USD)
