@@ -56,6 +56,14 @@ def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
         return []
 
 def aggiorna_cambi():
+    try:
+        _aggiorna_cambi_inner()
+    except Exception as e:
+        import traceback
+        print(f"❌ ERRORE CRITICO in aggiorna_cambi: {e}")
+        print(traceback.format_exc())
+
+def _aggiorna_cambi_inner():
     print(f"🔄 Avvio aggiornamento cambi - {date.today()}")
 
     conn = get_connection()
