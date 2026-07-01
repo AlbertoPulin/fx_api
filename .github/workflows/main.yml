@@ -2,7 +2,8 @@ name: Keep Alive
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # ogni 5 minuti
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # aggiunge bottone per avviarlo manualmente
 
 jobs:
   ping:
