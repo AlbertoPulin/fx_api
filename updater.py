@@ -1,6 +1,8 @@
 """
 Aggiorna fx_rates con i dati mancanti da Banca d'Italia.
-- BdI API: baseCurrencyIsoCode = valuta estera, currencyIsoCode = EUR o USD
+- Scarica solo EUR/XXX (tutte le valute contro EUR)
+- USD/XXX, GBP/XXX e altre vengono inferite al volo in main.py
+- BdI API: baseCurrencyIsoCode = valuta estera, currencyIsoCode = EUR
 - Parte dall'ultima data PER COPPIA fino a oggi
 - Invia email di notifica via Resend
 """
@@ -37,18 +39,16 @@ def invia_email(oggetto: str, corpo: str):
     except Exception as e:
         print(f"⚠️  Errore invio email: {e}")
 
-def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
+def fetch_daily(quote: str, start: str, end: str) -> list:
     """
-    BdI API:
-      baseCurrencyIsoCode = valuta estera (es. GBP)
-      currencyIsoCode     = EUR o USD (valuta di riferimento)
-    Per EUR/GBP: baseCurrencyIsoCode=GBP, currencyIsoCode=EUR
+    Scarica EUR/quote da BdI.
+    BdI API: baseCurrencyIsoCode = valuta estera, currencyIsoCode = EUR
     """
     params = {
         "startDate":           start,
         "endDate":             end,
-        "baseCurrencyIsoCode": quote,  # valuta estera
-        "currencyIsoCode":     base,   # EUR o USD
+        "baseCurrencyIsoCode": quote,  # valuta estera es. GBP
+        "currencyIsoCode":     "EUR",  # sempre EUR
         "lang": "it"
     }
     headers = {"Accept": "application/json"}
@@ -57,10 +57,10 @@ def fetch_daily(base: str, quote: str, start: str, end: str) -> list:
         if r.status_code == 200:
             return r.json().get("rates", [])
         if r.status_code != 400:
-            print(f"⚠️  {base}/{quote}: status {r.status_code} - {r.text[:100]}")
+            print(f"⚠️  EUR/{quote}: status {r.status_code} - {r.text[:100]}")
         return []
     except Exception as e:
-        print(f"⚠️  Errore {base}/{quote}: {e}")
+        print(f"⚠️  Errore EUR/{quote}: {e}")
         return []
 
 def aggiorna_cambi():
@@ -79,20 +79,20 @@ def _aggiorna_cambi_inner():
 
     end_date = date.today()
 
-    # Carica solo coppie EUR e USD
+    # Solo coppie EUR
     cur.execute("""
-        SELECT id, base, quote FROM currency_pairs
-        WHERE base IN ('EUR', 'USD')
+        SELECT id, quote FROM currency_pairs
+        WHERE base = 'EUR'
         ORDER BY symbol
     """)
     coppie = cur.fetchall()
-    print(f"📋 {len(coppie)} coppie da aggiornare")
+    print(f"📋 {len(coppie)} coppie EUR da aggiornare")
 
     totale = 0
     errori = 0
-    for i, (pair_id, base, quote) in enumerate(coppie, 1):
+    for i, (pair_id, quote) in enumerate(coppie, 1):
 
-        # Ultima data PER QUESTA COPPIA
+        # Ultima data per questa coppia
         cur.execute("SELECT MAX(date) FROM fx_rates WHERE pair_id = %s", (pair_id,))
         last_date = cur.fetchone()[0]
 
@@ -102,12 +102,12 @@ def _aggiorna_cambi_inner():
             start_date = last_date + timedelta(days=1)
 
         if start_date > end_date:
-            continue  # già aggiornata, salta
+            continue  # già aggiornata
 
         if i % 50 == 0 or i == 1:
-            print(f"   ⏳ [{i}/{len(coppie)}] {base}/{quote} dal {start_date}...")
+            print(f"   ⏳ [{i}/{len(coppie)}] EUR/{quote} dal {start_date}...")
 
-        rates = fetch_daily(base, quote, str(start_date), str(end_date))
+        rates = fetch_daily(quote, str(start_date), str(end_date))
         if not rates:
             time.sleep(0.1)
             continue
@@ -122,13 +122,14 @@ def _aggiorna_cambi_inner():
                 cur.execute("""
                     INSERT INTO fx_rates (pair_id, date, close)
                     VALUES (%s, %s, %s)
-                    ON CONFLICT (pair_id, date) DO NOTHING
+                    ON CONFLICT (pair_id, date)
+                    DO UPDATE SET close = EXCLUDED.close
                 """, (pair_id, ref_date, avg_rate))
-                if cur.rowcount == 1:
+                if cur.rowcount > 0:
                     inseriti += 1
             except Exception as e:
                 conn.rollback()
-                print(f"❌ {base}/{quote} {ref_date}: {e}")
+                print(f"❌ EUR/{quote} {ref_date}: {e}")
                 errori += 1
                 continue
 
@@ -147,7 +148,7 @@ def _aggiorna_cambi_inner():
 
 Righe inserite: {totale}
 Errori:         {errori}
-Coppie:         {len(coppie)} (EUR e USD)
+Coppie EUR:     {len(coppie)}
 
 FX API - Banca d'Italia
 """
