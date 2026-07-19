@@ -1,15 +1,24 @@
-from fastapi import APIRouter, HTTPException, Query, Response, Request
+from fastapi import APIRouter, HTTPException, Query, Response, Request, Header, Depends
 from cachetools import TTLCache
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from database import get_connection, release_connection
 from updater import aggiorna_cambi
 from typing import Optional
+import os
+import secrets
 import threading
 import xml.etree.ElementTree as ET
 
 router = APIRouter(prefix="/rates", tags=["FX Rates"])
 limiter = Limiter(key_func=get_remote_address)
+
+UPDATE_API_KEY = os.environ["UPDATE_API_KEY"]
+
+def verify_api_key(x_api_key: Optional[str] = Header(None)):
+    """Controlla l'header X-API-Key. Usa compare_digest per evitare timing attack."""
+    if not x_api_key or not secrets.compare_digest(x_api_key, UPDATE_API_KEY):
+        raise HTTPException(status_code=401, detail="API key mancante o non valida")
 
 # Cache in memoria: le quotazioni cambiano solo 2 volte al giorno (scheduler 7:00 / 18:00),
 # quindi tenerle in cache 5 minuti evita di interrogare il DB ad ogni richiesta identica.
@@ -34,7 +43,7 @@ def build_response(symbol: str, data: list, fmt: str):
 
 # --- Endpoints ---
 
-@router.get("/update")
+@router.get("/update", dependencies=[Depends(verify_api_key)])
 @limiter.limit("2/minute")  # aggiornamento manuale: va usato raramente, non ha senso spammarlo
 def update(request: Request):
     """Forza aggiornamento manuale dei cambi da BdI"""
