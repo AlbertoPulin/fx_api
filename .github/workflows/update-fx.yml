@@ -1,0 +1,16 @@
+name: Update FX Rates
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 7:00 ora italiana (6:00 UTC, occhio all'ora legale)
+    - cron: '0 17 * * *'  # 18:00 ora italiana (17:00 UTC)
+  workflow_dispatch:  # bottone per lanciarlo anche a mano
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger update
+        run: |
+          curl -f -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}" \
+            https://fx-api-vpxj.onrender.com/api/v1/rates/update
