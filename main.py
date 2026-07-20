@@ -20,5 +20,6 @@ scheduler.add_job(aggiorna_cambi, 'cron', hour=18, minute=0)
 scheduler.start()
 
 @app.get("/")
+@app.head("/")
 def root():
     return {"status": "ok", "description": "FX Rates API - Banca d'Italia"}
